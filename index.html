@@ -4,24 +4,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <title>KHO Gaem — HTML 게임 모음</title>
-  <meta name="description" content="KHO Gaem: 브라우저에서 바로 즐기는 HTML 게임 모음. 검색·장르 필터·즐겨찾기·다크모드 지원." />
-  <link rel="canonical" href="https://gaem.kho.kr/">
+  <title>KHO Game — HTML 게임 모음</title>
+  <meta name="description" content="KHO Game: 브라우저에서 바로 즐기는 HTML 게임 모음. 검색·장르 필터·즐겨찾기·다크모드 지원." />
+  <link rel="canonical" href="https://game.kho.kr/">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://gaem.kho.kr/">
-  <meta property="og:site_name" content="KHO Gaem">
-  <meta property="og:title" content="KHO Gaem — HTML 게임 모음">
+  <meta property="og:url" content="https://game.kho.kr/">
+  <meta property="og:site_name" content="KHO Game">
+  <meta property="og:title" content="KHO Game — HTML 게임 모음">
   <meta property="og:description" content="브라우저에서 바로 즐기는 HTML 게임 컬렉션. 검색, 장르 필터, 즐겨찾기 지원.">
   <!-- og:image은 나중에 교체 가능 -->
-  <meta property="og:image" content="https://gaem.kho.kr/og.png">
+  <meta property="og:image" content="https://game.kho.kr/og.png">
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="KHO Gaem">
+  <meta name="twitter:title" content="KHO Game">
   <meta name="twitter:description" content="브라우저에서 바로 즐기는 HTML 게임 컬렉션.">
-  <meta name="twitter:image" content="https://gaem.kho.kr/og.png">
+  <meta name="twitter:image" content="https://game.kho.kr/og.png">
 
   <!-- Favicon (data URI, 필요 시 교체) -->
   <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%230b5bfa"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="30" font-family="Arial" fill="white">K</text></svg>'>
@@ -219,11 +219,11 @@
   {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "KHO Gaem",
-    "url": "https://gaem.kho.kr/",
+    "name": "KHO Game",
+    "url": "https://game.kho.kr/",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": "https://gaem.kho.kr/?q={search_term_string}",
+      "target": "https://game.kho.kr/?q={search_term_string}",
       "query-input": "required name=search_term_string"
     }
   }
@@ -234,9 +234,9 @@
 
   <header>
     <div class="topbar container">
-      <div class="logo" aria-label="KHO Gaem">
+      <div class="logo" aria-label="KHO Game">
         <div class="logo-badge" aria-hidden="true">K</div>
-        <div class="brand">KHO Gaem</div>
+        <div class="brand">KHO Game</div>
       </div>
       <div class="spacer"></div>
       <button id="themeBtn" class="icon-btn" type="button" title="테마 전환 (다크/라이트)">
@@ -247,7 +247,7 @@
 
   <main class="container">
     <section class="hero">
-      <h1>KHO Gaem — 브라우저에서 바로 즐기는 HTML 게임</h1>
+      <h1>KHO Game — 브라우저에서 바로 즐기는 HTML 게임</h1>
       <p>검색, 장르 필터, 정렬, 즐겨찾기를 지원합니다. <span class="count" id="resultCount" aria-live="polite"></span></p>
 
       <div class="toolbar" role="region" aria-label="검색과 필터">
@@ -283,14 +283,14 @@
     <div id="empty" class="empty" hidden>조건에 맞는 게임이 없어요. 필터를 조정해 보세요.</div>
 
     <footer>
-      © <span id="year"></span> KHO Gaem · <a href="https://gaem.kho.kr/">gaem.kho.kr</a> ·
+      © <span id="year"></span> KHO Game · <a href="https://game.kho.kr/">game.kho.kr</a> ·
       <a href="mailto:me@kho.kr">me@kho.kr</a>
     </footer>
   </main>
 
   <script>
     // ===== 사이트/초기 설정 =====
-    const SITE = { name: "KHO Gaem", domain: "gaem.kho.kr" };
+    const SITE = { name: "KHO Game", domain: "game.kho.kr" };
 
     // 다크/라이트 테마 토글
     (function initTheme(){
@@ -375,7 +375,7 @@
       </text>
       <text x='50%' y='90%' text-anchor='middle'
             font-family='Inter, Arial, sans-serif'
-            font-size='28' fill='white' opacity='.7'>KHO Gaem</text>
+            font-size='28' fill='white' opacity='.7'>KHO Game</text>
     </svg>`.trim();
 
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
