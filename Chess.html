@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KHO Game — Canvas Chess</title>
+  <meta name="description" content="KHO Game: 브라우저에서 즐기는 캔버스 체스. 드래그 앤 드롭, 합법 수, 체크/체크메이트, 무르기, FEN 입/출력, 보드 뒤집기 지원." />
+  <style>
+    :root{
+      --bg: #0f1115;
+      --panel: #151925;
+      --text: #d7e1ff;
+      --muted: #8aa0c2;
+      --brand: #66a3ff;
+      --accent: #89f7fe;
+      --light: #f0d9b5; /* board light */
+      --dark: #b58863;  /* board dark  */
+      --hl: rgba(255, 214, 10, 0.35);
+      --move: rgba(102,163,255,0.35);
+      --last: rgba(137,247,254,0.35);
+      --danger: #ff6b6b;
+      --ok: #28c76f;
+    }
+    *{ box-sizing: border-box; }
+    html, body{ height:100%; }
+    body{
+      margin:0; background:linear-gradient(160deg, #0b0d12, #0f1115 40%, #0b1020);
+      color:var(--text); font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    }
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:18px clamp(16px, 4vw, 28px);
+      background:linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+      border-bottom:1px solid rgba(255,255,255,0.06);
+      position:sticky; top:0; z-index:10; backdrop-filter: blur(6px);
+    }
+    .brand{ display:flex; align-items:center; gap:12px; }
+    .logo{
+      width:36px; height:36px; border-radius:10px;
+      background: radial-gradient(120% 120% at 20% 20%, var(--accent), var(--brand) 60%, #2e5bff 100%);
+      box-shadow: 0 10px 30px rgba(102,163,255,0.35), inset 0 0 24px rgba(255,255,255,0.35);
+    }
+    .title{ font-weight:700; letter-spacing:0.2px; }
+    .subtitle{ color:var(--muted); font-size:12px; }
+
+    main{ max-width:1200px; margin: 20px auto; padding: 0 clamp(12px, 3vw, 24px); }
+    .wrap{ display:grid; grid-template-columns: 1fr; gap:18px; }
+    @media(min-width: 1000px){ .wrap{ grid-template-columns: minmax(320px, 720px) 1fr; align-items:start; } }
+
+    .boardCard, .sideCard{
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; overflow:hidden;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    }
+    .boardTop{
+      display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+    }
+    .tag{ font-size:12px; color:var(--muted); }
+
+    canvas#board{ width:100%; aspect-ratio:1/1; display:block; background:#000; }
+
+    .toolbar{
+      display:flex; flex-wrap:wrap; gap:8px; padding:12px 14px; border-top:1px solid rgba(255,255,255,0.06);
+    }
+    button{
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
+      border:1px solid rgba(255,255,255,0.12); color:var(--text);
+      padding:10px 12px; border-radius:12px; cursor:pointer; font-weight:600;
+      transition: transform .06s ease, border-color .2s ease, background .2s ease;
+    }
+    button:hover{ transform: translateY(-1px); border-color: rgba(102,163,255,0.6); }
+    button:active{ transform: translateY(0); }
+    .primary{ background: linear-gradient(180deg, rgba(102,163,255,0.35), rgba(102,163,255,0.18)); border-color: rgba(102,163,255,0.55); }
+
+    .sideCard{ padding:16px; }
+    .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .label{ font-size:13px; color:var(--muted); }
+    .value{ font-weight:700; }
+
+    .moves{
+      background: rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px; height:340px; overflow:auto;
+      font-variant-numeric: tabular-nums; line-height:1.6;
+    }
+    .moves ol{ margin:0; padding-left: 22px; }
+    .moves li{ padding: 2px 0; }
+
+    .captured{
+      display:flex; gap:8px; flex-wrap:wrap; min-height: 28px; align-items:center;
+      background: rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:8px 10px;
+    }
+
+    .status{ padding:10px 12px; border-radius:12px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); }
+
+    .kho{ font-size:12px; color:var(--muted); margin-top:8px; }
+
+    /* Promotion modal */
+    .modal{ position:fixed; inset:0; display:none; place-items:center; background: rgba(0,0,0,0.35); z-index:30; }
+    .modal.active{ display:grid; }
+    .modalCard{ background: var(--panel); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:14px; width: min(92vw, 380px); }
+    .modalGrid{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+    .pieceBtn{ font-size:28px; padding:14px 0; text-align:center; border-radius:12px; border:1px solid rgba(255,255,255,0.12); cursor:pointer;
+      background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04)); }
+    .pieceBtn:hover{ border-color: var(--brand); }
+
+    .note{ color:var(--muted); font-size:12px; margin-top:10px; }
+
+    footer{ max-width:1200px; margin:24px auto; padding: 0 clamp(12px, 3vw, 24px); color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <div class="title">KHO Game — Canvas Chess</div>
+        <div class="subtitle">서비스사: <strong>KHO</strong> · 고품질 캔버스 기반 체스 게임</div>
+      </div>
+    </div>
+    
+    <!-- ✅ 메인페이지 버튼 추가 -->
+    <button class="primary" onclick="location.href='/'">메인으로</button>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <section class="boardCard">
+        <div class="boardTop">
+          <div class="tag">보드</div>
+          <div class="tag" id="turnTag">백 차례</div>
+        </div>
+        <canvas id="board" width="800" height="800" aria-label="Chess board on canvas"></canvas>
+        <div class="toolbar">
+          <button class="primary" id="newBtn">새 게임</button>
+          <button id="undoBtn">무르기</button>
+          <button id="flipBtn">보드 뒤집기</button>
+          <button id="legalBtn">합법 수 표시: 켬</button>
+          <button id="fenExportBtn">FEN 복사</button>
+          <button id="fenImportBtn">FEN 불러오기</button>
+        </div>
+      </section>
+
+      <aside class="sideCard">
+        <div class="row"><div class="label">상태</div><div class="value" id="status">게임 시작됨</div></div>
+        <div class="row"><div class="label">체크</div><div class="value" id="checkState">-</div></div>
+        <div class="row"><div class="label">백 잡은 말</div></div>
+        <div class="captured" id="capWhite"></div>
+        <div class="row"><div class="label">흑 잡은 말</div></div>
+        <div class="captured" id="capBlack"></div>
+        <div class="row" style="margin-top:12px"><div class="label">기보</div></div>
+        <div class="moves" id="moves"><ol id="moveList"></ol></div>
+        <div class="kho">© KHO · KHO Game Canvas Chess</div>
+      </aside>
+    </div>
+  </main>
+
+  <div class="modal" id="promoModal" role="dialog" aria-modal="true" aria-labelledby="promoTitle">
+    <div class="modalCard">
+      <div id="promoTitle" style="font-weight:700; margin-bottom:10px">승진할 말을 선택하세요</div>
+      <div class="modalGrid">
+        <div class="pieceBtn" data-piece="q">♕ / ♛</div>
+        <div class="pieceBtn" data-piece="r">♖ / ♜</div>
+        <div class="pieceBtn" data-piece="b">♗ / ♝</div>
+        <div class="pieceBtn" data-piece="n">♘ / ♞</div>
+      </div>
+      <div class="note">선택 즉시 수가 완성됩니다.</div>
+    </div>
+  </div>
+
+  <footer>
+    <p>브라우저 캔버스로 구현된 체스입니다. 드래그 앤 드롭 또는 클릭으로 이동하세요. 체크/체크메이트 감지, 캐슬링·앙파상·프로모션, 무르기, FEN 입출력, 보드 뒤집기, 합법 수 하이라이트를 지원합니다.</p>
+  </footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ========= UI helpers =========
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  let sizePx = 800; // internal drawing size, will scale to element width
+  let sq = sizePx / 8;
+
+  function fitCanvas(){
+    const cssW = canvas.clientWidth || canvas.parentElement.clientWidth;
+    const w = Math.round(cssW * dpr);
+    canvas.width = w; canvas.height = w; // square
+    sizePx = w; sq = sizePx / 8;
+    draw();
+  }
+  new ResizeObserver(fitCanvas).observe(canvas);
+  window.addEventListener('orientationchange', fitCanvas);
+
+  // ========= Chess engine state =========
+  const PIECE_UNICODE = {
+    'wp':'\u2659','wn':'\u2658','wb':'\u2657','wr':'\u2656','wq':'\u2655','wk':'\u2654',
+    'bp':'\u265F','bn':'\u265E','bb':'\u265D','br':'\u265C','bq':'\u265B','bk':'\u265A'
+  };
+  const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+  // Game state object
+  const G = {
+    board: new Array(64).fill(null), // each: {type:'p|n|b|r|q|k', color:'w|b'}
+    turn: 'w',
+    castling: {K:true, Q:true, k:true, q:true},
+    ep: -1, // en passant target square index or -1
+    halfmove: 0,
+    fullmove: 1,
+    history: [], // stack of move records for undo
+    flipped: false,
+    showLegal: true,
+    captured: { w: [], b: [] },
+  };
+
+  const isPiece = (p)=> !!p && typeof p.color === 'string' && typeof p.type === 'string';
+  function clonePiece(p){ return isPiece(p) ? {type:p.type, color:p.color} : null; }
+
+  // ========= FEN parse & export =========
+  function loadFEN(fen){
+    const parts = fen.trim().split(/\s+/);
+    if(parts.length < 4) throw new Error('Invalid FEN');
+    // board
+    const rows = parts[0].split('/');
+    if(rows.length !== 8) throw new Error('Invalid FEN board');
+    G.board.fill(null);
+    for(let r=0;r<8;r++){
+      let c=0;
+      for(const ch of rows[r]){
+        if(/[1-8]/.test(ch)){
+          c += parseInt(ch, 10);
+        }else{
+          const color = ch === ch.toUpperCase() ? 'w' : 'b';
+          const type = ch.toLowerCase();
+          const idx = r*8 + c;
+          G.board[idx] = {type, color};
+          c++;
+        }
+      }
+      if(c!==8) throw new Error('Invalid FEN row width');
+    }
+    // active color
+    G.turn = parts[1] === 'b' ? 'b' : 'w';
+    // castling
+    G.castling = {K:false,Q:false,k:false,q:false};
+    if(parts[2] !== '-'){
+      for(const ch of parts[2]){ if(Object.prototype.hasOwnProperty.call(G.castling, ch)) G.castling[ch] = true; }
+    }
+    // en passant
+    G.ep = parts[3] === '-' ? -1 : algebraicToIndex(parts[3]);
+    // optional clocks
+    G.halfmove = parts[4] ? parseInt(parts[4],10) : 0;
+    G.fullmove = parts[5] ? parseInt(parts[5],10) : 1;
+    // reset extras
+    G.history = [];
+    G.captured = { w: [], b: [] };
+    updateStatus();
+    draw();
+  }
+
+  function exportFEN(){
+    const rows = [];
+    for(let r=0;r<8;r++){
+      let row=''; let empty=0;
+      for(let c=0;c<8;c++){
+        const p = G.board[r*8+c];
+        if(!isPiece(p)){ empty++; }
+        else {
+          if(empty){ row+=empty; empty=0; }
+          const ch = pieceLetter(p);
+          row += p.color==='w' ? ch.toUpperCase() : ch;
+        }
+      }
+      if(empty) row+=empty;
+      rows.push(row);
+    }
+    const cast = ['K','Q','k','q'].filter(k=>G.castling[k]).join('') || '-';
+    const ep = G.ep === -1 ? '-' : indexToAlgebraic(G.ep);
+    return `${rows.join('/') } ${G.turn} ${cast} ${ep} ${G.halfmove} ${G.fullmove}`;
+  }
+
+  // ========= Coordinates =========
+  function indexToRC(i){ return [Math.floor(i/8), i%8]; }
+  function rcToIndex(r,c){ return r*8+c; }
+  function indexToAlgebraic(i){ const [r,c]=indexToRC(i); return 'abcdefgh'[c] + (8-r); }
+  function algebraicToIndex(s){ const f = 'abcdefgh'.indexOf(s[0]); const rank = parseInt(s[1],10); return rcToIndex(8-rank, f); }
+  function pieceLetter(p){ return p.type; }
+
+  // ========= Move generation helpers =========
+  const DIRS = {
+    N:[[ -2,-1],[ -2, 1],[ -1,-2],[ -1, 2],[ 1,-2],[ 1, 2],[ 2,-1],[ 2, 1]],
+    B:[[ -1,-1],[ -1, 1],[ 1,-1],[ 1, 1]],
+    R:[[ -1, 0],[ 1, 0],[ 0,-1],[ 0, 1]],
+    K:[[ -1,-1],[ -1, 0],[ -1, 1],[ 0,-1],[ 0, 1],[ 1,-1],[ 1, 0],[ 1, 1]]
+  };
+  function onBoard(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
+
+  function findKing(color){
+    for(let i=0;i<64;i++){ const p=G.board[i]; if(isPiece(p) && p.type==='k' && p.color===color) return i; }
+    return -1;
+  }
+
+  function squareAttackedBy(idx, byColor){
+    const [r,c]=indexToRC(idx);
+    // Pawn attacks
+    if(byColor==='w'){
+      const pr=r-1, pcL=c-1, pcR=c+1;
+      if(onBoard(pr,pcL)){ const p=G.board[rcToIndex(pr,pcL)]; if(isPiece(p) && p.color==='w' && p.type==='p') return true; }
+      if(onBoard(pr,pcR)){ const p=G.board[rcToIndex(pr,pcR)]; if(isPiece(p) && p.color==='w' && p.type==='p') return true; }
+    } else {
+      const pr=r+1, pcL=c-1, pcR=c+1;
+      if(onBoard(pr,pcL)){ const p=G.board[rcToIndex(pr,pcL)]; if(isPiece(p) && p.color==='b' && p.type==='p') return true; }
+      if(onBoard(pr,pcR)){ const p=G.board[rcToIndex(pr,pcR)]; if(isPiece(p) && p.color==='b' && p.type==='p') return true; }
+    }
+    // Knights
+    for(const [dr,dc] of DIRS.N){ const rr=r+dr, cc=c+dc; if(onBoard(rr,cc)){ const p=G.board[rcToIndex(rr,cc)]; if(isPiece(p) && p.color===byColor && p.type==='n') return true; }}
+    // Kings (adjacent)
+    for(const [dr,dc] of DIRS.K){ const rr=r+dr, cc=c+dc; if(onBoard(rr,cc)){ const p=G.board[rcToIndex(rr,cc)]; if(isPiece(p) && p.color===byColor && p.type==='k') return true; }}
+    // Sliding: bishops/queens (diagonals)
+    for(const [dr,dc] of DIRS.B){ let rr=r+dr, cc=c+dc; while(onBoard(rr,cc)){ const p=G.board[rcToIndex(rr,cc)]; if(p){ if(isPiece(p) && p.color===byColor && (p.type==='b'||p.type==='q')) return true; break; } rr+=dr; cc+=dc; }}
+    // Sliding: rooks/queens (orthogonals)
+    for(const [dr,dc] of DIRS.R){ let rr=r+dr, cc=c+dc; while(onBoard(rr,cc)){ const p=G.board[rcToIndex(rr,cc)]; if(p){ if(isPiece(p) && p.color===byColor && (p.type==='r'||p.type==='q')) return true; break; } rr+=dr; cc+=dc; }}
+    return false;
+  }
+
+  function inCheck(color){
+    const k = findKing(color);
+    if(k<0) return false; // no king found (invalid FEN) — treat as not in check for safety
+    const opp = color==='w' ? 'b' : 'w';
+    return squareAttackedBy(k, opp);
+  }
+
+  function generatePseudoMovesFor(from){
+    const moves=[]; const p = G.board[from]; if(!isPiece(p)) return moves; const color=p.color; const [r,c]=indexToRC(from);
+    const fwd = color==='w' ? -1 : 1; // row delta forward
+    const startRow = color==='w' ? 6 : 1; // pawn start rows
+    if(p.type==='p'){
+      // one step
+      const r1=r+fwd; if(onBoard(r1,c) && !isPiece(G.board[rcToIndex(r1,c)])){
+        moves.push({from, to: rcToIndex(r1,c), piece:p, capture:null, promo: (r1===0||r1===7) ? 'q' : null});
+        // two step
+        const r2=r+2*fwd; if(r===startRow && !isPiece(G.board[rcToIndex(r2,c)]) && !isPiece(G.board[rcToIndex(r1,c)])){
+          moves.push({from, to: rcToIndex(r2,c), piece:p, capture:null, dbl:true});
+        }
+      }
+      // captures
+      for(const dc of [-1,1]){
+        const rr=r+fwd, cc=c+dc; if(onBoard(rr,cc)){
+          const to=rcToIndex(rr,cc); const q=G.board[to];
+          if(isPiece(q) && q.color!==color){ moves.push({from, to, piece:p, capture:q, promo:(rr===0||rr===7)?'q':null}); }
+        }
+      }
+      // en passant
+      if(G.ep!==-1){ const [er,ec]=indexToRC(G.ep); if(er===r+fwd && Math.abs(ec-c)===1){ moves.push({from, to:G.ep, piece:p, capture:{type:'p', color: color==='w'?'b':'w', ep:true}, ep:true}); }}
+    }
+    else if(p.type==='n'){
+      for(const [dr,dc] of DIRS.N){ const rr=r+dr, cc=c+dc; if(onBoard(rr,cc)){ const to=rcToIndex(rr,cc); const q=G.board[to]; if(!isPiece(q) || q.color!==color){ moves.push({from,to,piece:p,capture:isPiece(q)?q:null}); }}}
+    }
+    else if(p.type==='b' || p.type==='r' || p.type==='q'){
+      const dirs = p.type==='b' ? DIRS.B : p.type==='r' ? DIRS.R : DIRS.B.concat(DIRS.R);
+      for(const [dr,dc] of dirs){ let rr=r+dr, cc=c+dc; while(onBoard(rr,cc)){ const to=rcToIndex(rr,cc); const q=G.board[to]; if(!isPiece(q)){ moves.push({from,to,piece:p,capture:null}); } else { if(q.color!==color) moves.push({from,to,piece:p,capture:q}); break; } rr+=dr; cc+=dc; }}
+    }
+    else if(p.type==='k'){
+      for(const [dr,dc] of DIRS.K){ const rr=r+dr, cc=c+dc; if(onBoard(rr,cc)){ const to=rcToIndex(rr,cc); const q=G.board[to]; if(!isPiece(q) || q.color!==color){ moves.push({from,to,piece:p,capture:isPiece(q)?q:null}); }}}
+      // castling
+      if(color==='w'){
+        const e1=60,f1=61,g1=62,d1=59,c1=58,b1=57,a1=56;
+        if(from===e1){
+          if(G.castling.K && !isPiece(G.board[f1]) && !isPiece(G.board[g1]) && !squareAttackedBy(e1,'b') && !squareAttackedBy(f1,'b') && !squareAttackedBy(g1,'b') && isPiece(G.board[63]) && G.board[63].type==='r' && G.board[63].color==='w'){
+            moves.push({from,to:g1,piece:p,castle:'K'});
+          }
+          if(G.castling.Q && !isPiece(G.board[d1]) && !isPiece(G.board[c1]) && !isPiece(G.board[b1]) && !squareAttackedBy(e1,'b') && !squareAttackedBy(d1,'b') && !squareAttackedBy(c1,'b') && isPiece(G.board[56]) && G.board[56].type==='r' && G.board[56].color==='w'){
+            moves.push({from,to:c1,piece:p,castle:'Q'});
+          }
+        }
+      } else {
+        const e8=4,f8=5,g8=6,d8=3,c8=2,b8=1,a8=0;
+        if(from===e8){
+          if(G.castling.k && !isPiece(G.board[f8]) && !isPiece(G.board[g8]) && !squareAttackedBy(e8,'w') && !squareAttackedBy(f8,'w') && !squareAttackedBy(g8,'w') && isPiece(G.board[7]) && G.board[7].type==='r' && G.board[7].color==='b'){
+            moves.push({from,to:g8,piece:p,castle:'k'});
+          }
+          if(G.castling.q && !isPiece(G.board[d8]) && !isPiece(G.board[c8]) && !isPiece(G.board[b8]) && !squareAttackedBy(e8,'w') && !squareAttackedBy(d8,'w') && !squareAttackedBy(c8,'w') && isPiece(G.board[0]) && G.board[0].type==='r' && G.board[0].color==='b'){
+            moves.push({from,to:c8,piece:p,castle:'q'});
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  function makeMove(m){
+    // Save snapshot for undo
+    const snap = {
+      from: m.from, to: m.to,
+      moved: clonePiece(G.board[m.from]),
+      captured: m.capture ? clonePiece(m.capture) : clonePiece(G.board[m.to]),
+      prevCast: {...G.castling}, prevEp: G.ep, prevHalf: G.halfmove, prevFull: G.fullmove,
+      castle: m.castle || null, ep: m.ep || false, promo: m.promoted || null, rookMove: null
+    };
+
+    // Move piece
+    const moving = G.board[m.from];
+    G.board[m.from] = null;
+
+    // En passant capture removal
+    if(m.ep){
+      const [tr,tc]=indexToRC(m.to);
+      const capIdx = moving.color==='w' ? rcToIndex(tr+1, tc) : rcToIndex(tr-1, tc);
+      snap.captured = clonePiece(G.board[capIdx]);
+      G.board[capIdx] = null;
+    }
+
+    // Castling rook move
+    if(m.castle){
+      if(m.castle==='K'){ // white king side
+        G.board[m.to] = moving;
+        const rookFrom=63, rookTo=61; snap.rookMove={from:rookFrom,to:rookTo};
+        G.board[rookTo] = G.board[rookFrom]; G.board[rookFrom] = null;
+      } else if(m.castle==='Q'){
+        G.board[m.to] = moving;
+        const rookFrom=56, rookTo=59; snap.rookMove={from:rookFrom,to:rookTo};
+        G.board[rookTo] = G.board[rookFrom]; G.board[rookFrom] = null;
+      } else if(m.castle==='k'){
+        G.board[m.to] = moving;
+        const rookFrom=7, rookTo=5; snap.rookMove={from:rookFrom,to:rookTo};
+        G.board[rookTo] = G.board[rookFrom]; G.board[rookFrom] = null;
+      } else if(m.castle==='q'){
+        G.board[m.to] = moving;
+        const rookFrom=0, rookTo=3; snap.rookMove={from:rookFrom,to:rookTo};
+        G.board[rookTo] = G.board[rookFrom]; G.board[rookFrom] = null;
+      }
+    } else {
+      // normal move
+      G.board[m.to] = moving;
+    }
+
+    // Promotion
+    if(m.promoted){ moving.type = m.promoted; snap.promo = m.promoted; }
+
+    // Update castling rights
+    function disableCastForSquare(idx){
+      if(idx===60){ G.castling.K=false; G.castling.Q=false; }
+      if(idx===4){ G.castling.k=false; G.castling.q=false; }
+      if(idx===63) G.castling.K=false; if(idx===56) G.castling.Q=false;
+      if(idx===7) G.castling.k=false; if(idx===0) G.castling.q=false;
+    }
+    // moving from or capturing rooks/king
+    disableCastForSquare(m.from); disableCastForSquare(m.to);
+
+    // En passant target
+    if(m.dbl){ G.ep = moving.color==='w' ? m.from-8 : m.from+8; } else { G.ep = -1; }
+
+    // Halfmove clock
+    if(moving.type==='p' || snap.captured) G.halfmove = 0; else G.halfmove++;
+
+    // Captured pieces list (for side panels)
+    if(snap.captured){ const opp = moving.color==='w' ? 'b':'w'; G.captured[opp].push(pieceGlyph(snap.captured)); }
+
+    // Switch turn
+    if(G.turn==='b') G.fullmove++;
+    G.turn = G.turn==='w' ? 'b' : 'w';
+
+    // Save history
+    G.history.push(snap);
+
+    updateStatus(m);
+    draw();
+  }
+
+  function undo(){
+    const snap = G.history.pop(); if(!snap) return;
+    // restore board
+    let moving = clonePiece(G.board[snap.to]);
+    if(!moving) moving = clonePiece(snap.moved); // 안전장치
+
+    // Undo castling rook move
+    if(snap.rookMove){ G.board[snap.rookMove.from] = G.board[snap.rookMove.to]; G.board[snap.rookMove.to] = null; }
+
+    // Undo promotion
+    if(snap.promo && isPiece(moving)){ moving.type = 'p'; }
+
+    // Put back mover
+    G.board[snap.from] = moving;
+
+    // Restore destination & EP capture
+    const moverColor = isPiece(moving) ? moving.color : (snap.moved ? snap.moved.color : 'w');
+    if(snap.ep){
+      const [tr,tc]=indexToRC(snap.to);
+      const capIdx = moverColor==='w' ? rcToIndex(tr+1, tc) : rcToIndex(tr-1, tc);
+      G.board[snap.to] = null;
+      G.board[capIdx] = clonePiece(snap.captured);
+    } else {
+      G.board[snap.to] = clonePiece(snap.captured);
+    }
+
+    // Restore game state
+    G.castling = {...snap.prevCast}; G.ep = snap.prevEp; G.halfmove = snap.prevHalf; G.fullmove = snap.prevFull;
+    G.turn = G.turn==='w' ? 'b' : 'w';
+
+    // Captured list pop if any
+    if(snap.captured){ const opp = moverColor==='w' ? 'b':'w'; G.captured[opp].pop(); }
+
+    updateStatus();
+    draw();
+  }
+
+  function generateAllLegalMoves(){
+    const color = G.turn; const moves=[];
+    for(let i=0;i<64;i++){ const p=G.board[i]; if(isPiece(p) && p.color===color){
+      const pseudo = generatePseudoMovesFor(i);
+      for(const m of pseudo){ if(isLegal(m)) moves.push(m); }
+    }}
+    return moves;
+  }
+
+  function isLegal(m){
+    if(!m || !isPiece(G.board[m.from])) return false;
+    // Make move on a temp board
+    const saved = {
+      a: G.board[m.from], b: G.board[m.to], ep: G.ep, cast: {...G.castling}, turn:G.turn, half:G.halfmove, full:G.fullmove
+    };
+    // Simulate
+    const moving = G.board[m.from];
+    G.board[m.from] = null;
+    if(m.ep){
+      const [tr,tc]=indexToRC(m.to); const capIdx = moving.color==='w' ? rcToIndex(tr+1, tc) : rcToIndex(tr-1, tc);
+      G.board[capIdx] = null;
+    }
+    // Castling rook simulation
+    let rookFrom=null, rookTo=null;
+    if(m.castle){
+      if(m.castle==='K'){ rookFrom=63; rookTo=61; }
+      else if(m.castle==='Q'){ rookFrom=56; rookTo=59; }
+      else if(m.castle==='k'){ rookFrom=7; rookTo=5; }
+      else if(m.castle==='q'){ rookFrom=0; rookTo=3; }
+      G.board[rookTo] = G.board[rookFrom]; G.board[rookFrom] = null;
+    }
+    G.board[m.to] = {type: m.promoted ? m.promoted : moving.type, color: moving.color};
+
+    const check = inCheck(moving.color);
+
+    // Revert
+    G.board[m.from] = saved.a; G.board[m.to] = saved.b; if(m.ep){ const [tr,tc]=indexToRC(m.to); const capIdx = moving.color==='w' ? rcToIndex(tr+1, tc) : rcToIndex(tr-1, tc); G.board[capIdx] = {type:'p', color: moving.color==='w'?'b':'w'}; }
+    if(m.castle){ G.board[rookFrom] = G.board[rookTo]; G.board[rookTo] = null; }
+
+    return !check;
+  }
+
+  function pieceGlyph(p){ return isPiece(p) ? (PIECE_UNICODE[p.color + p.type] || '') : ''; }
+
+  // ========= Rendering =========
+  let selected = -1; let dragging=false; let dragX=0, dragY=0; let legalForSelected=[]; let lastMove=null;
+
+  function boardToDisplay(idx){ if(!G.flipped) return idx; const [r,c]=indexToRC(idx); return rcToIndex(7-r,7-c); }
+  function displayToBoard(xIdx){ if(!G.flipped) return xIdx; const [r,c]=indexToRC(xIdx); return rcToIndex(7-r,7-c); }
+
+  function draw(){
+    // background
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Squares
+    for(let i=0;i<64;i++){
+      const di = boardToDisplay(i); const [r,c]=indexToRC(di);
+      const isLight = (r+c)%2===0;
+      ctx.fillStyle = isLight ? getComputedStyle(document.documentElement).getPropertyValue('--light') : getComputedStyle(document.documentElement).getPropertyValue('--dark');
+      ctx.fillRect(c*sq, r*sq, sq, sq);
+    }
+
+    // Last move highlight
+    if(lastMove){
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--last');
+      const a = boardToDisplay(lastMove.from), b = boardToDisplay(lastMove.to);
+      const [ar,ac]=indexToRC(a); const [br,bc]=indexToRC(b);
+      ctx.fillRect(ac*sq, ar*sq, sq, sq);
+      ctx.fillRect(bc*sq, br*sq, sq, sq);
+    }
+
+    // Selected + legal moves highlight
+    if(G.showLegal && selected!==-1){
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--move');
+      for(const m of legalForSelected){ const di = boardToDisplay(m.to); const [r,c]=indexToRC(di); ctx.fillRect(c*sq, r*sq, sq, sq); }
+      // selected
+      const di = boardToDisplay(selected); const [sr,sc]=indexToRC(di);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--hl');
+      ctx.fillRect(sc*sq, sr*sq, sq, sq);
+    }
+
+    // Coordinates
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.font = (sq*0.18) + 'px ui-sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+    for(let r=0;r<8;r++){
+      for(let c=0;c<8;c++){
+        const idx = displayToBoard(rcToIndex(r,c));
+        const alg = indexToAlgebraic(idx);
+        if(c===0){ ctx.fillText(alg[1], c*sq+4, r*sq+4); }
+        if(r===7){ ctx.fillText(alg[0], c*sq+sq-14, r*sq+sq-18); }
+      }
+    }
+    ctx.restore();
+
+    // Pieces (draw under-drag pieces first)
+    for(let i=0;i<64;i++){
+      if(i===selected && dragging) continue; // we'll draw dragged later
+      const p=G.board[i]; if(!isPiece(p)) continue;
+      drawPiece(i, p);
+    }
+
+    // Dragged piece on top
+    if(dragging && selected!==-1){
+      const p=G.board[selected]; if(isPiece(p)){ drawPieceAtPixel(p, dragX, dragY, 0.92, 0.9); }
+    }
+  }
+
+  function drawPiece(idx, p){
+    const di = boardToDisplay(idx); const [r,c]=indexToRC(di);
+    const cx = c*sq + sq/2; const cy = r*sq + sq/2;
+    drawPieceAtPixel(p, cx, cy, 1.0, 1.0);
+  }
+
+  function drawPieceAtPixel(p, cx, cy, scale=1.0, alpha=1.0){
+    if(!isPiece(p)) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const glyph = pieceGlyph(p);
+    // Base disk for contrast
+    ctx.beginPath(); ctx.arc(cx, cy, sq*0.42*scale, 0, Math.PI*2);
+    ctx.fillStyle = p.color==='w' ? 'rgba(255,255,255,0.9)' : 'rgba(30,35,45,0.9)';
+    ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke();
+
+    // Glyph
+    ctx.fillStyle = p.color==='w' ? '#141824' : '#e7eeff';
+    ctx.font = (sq*0.6*scale) + 'px "Segoe UI Symbol", "Noto Sans Symbols2", "DejaVu Sans", sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(glyph, cx, cy+1);
+
+    ctx.restore();
+  }
+
+  function getSquareFromEvent(ev){
+    const rect = canvas.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * (canvas.width/rect.width);
+    const y = (ev.clientY - rect.top) * (canvas.height/rect.height);
+    const c = Math.floor(x / sq); const r = Math.floor(y / sq);
+    if(r<0||r>7||c<0||c>7) return -1;
+    const di = rcToIndex(r,c);
+    return displayToBoard(di);
+  }
+
+  function legalMovesFrom(from){
+    const ps = generatePseudoMovesFor(from); const out=[];
+    for(const m of ps){ if(isLegal(m)) out.push(m); }
+    return out;
+  }
+
+  // ========= Event handlers =========
+  function handleDrop(ev){
+    if(selected===-1){ dragging=false; return; }
+    const sqIdx = getSquareFromEvent(ev);
+    if(sqIdx!==-1){
+      const targetMove = legalForSelected.find(m=>m.to===sqIdx);
+      if(targetMove){
+        if(targetMove.promo && (indexToRC(targetMove.to)[0]===0 || indexToRC(targetMove.to)[0]===7)){
+          pendingPromotion = targetMove; openPromotionModal();
+        } else {
+          lastMove = {from: targetMove.from, to: targetMove.to};
+          makeMove(targetMove); addMoveToList(targetMove);
+        }
+      }
+    }
+    dragging=false; selected=-1; legalForSelected=[]; draw();
+  }
+
+  canvas.addEventListener('mousedown', (ev)=>{
+    const sqIdx = getSquareFromEvent(ev); if(sqIdx===-1) return;
+    const p = G.board[sqIdx];
+    // If already selecting and clicked a legal destination, move
+    if(selected!==-1){
+      const targetMove = legalForSelected.find(m=>m.to===sqIdx);
+      if(targetMove){
+        if(targetMove.promo && (indexToRC(targetMove.to)[0]===0 || indexToRC(targetMove.to)[0]===7)){
+          pendingPromotion = targetMove; openPromotionModal();
+        } else { lastMove = {from: targetMove.from, to: targetMove.to}; makeMove(targetMove); addMoveToList(targetMove); }
+        selected = -1; dragging=false; legalForSelected=[]; return;
+      }
+    }
+
+    if(!isPiece(p) || p.color!==G.turn) { selected = -1; dragging=false; legalForSelected=[]; draw(); return; }
+    selected = sqIdx; legalForSelected = legalMovesFrom(selected);
+    dragging = true;
+    const rect = canvas.getBoundingClientRect();
+    dragX = (ev.clientX - rect.left) * (canvas.width/rect.width);
+    dragY = (ev.clientY - rect.top) * (canvas.height/rect.height);
+    draw();
+  });
+
+  canvas.addEventListener('mousemove', (ev)=>{
+    if(!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    dragX = (ev.clientX - rect.left) * (canvas.width/rect.width);
+    dragY = (ev.clientY - rect.top) * (canvas.height/rect.height);
+    draw();
+  });
+
+  canvas.addEventListener('mouseup', handleDrop);
+  window.addEventListener('mouseup', handleDrop); // 캔버스 밖 드롭 대비
+
+  // Click support for tapping
+  canvas.addEventListener('click', (ev)=>{
+    const sqIdx = getSquareFromEvent(ev); if(sqIdx===-1) return;
+    if(selected!==-1){ const targetMove = legalForSelected.find(m=>m.to===sqIdx); if(targetMove){ if(targetMove.promo){ pendingPromotion=targetMove; openPromotionModal(); } else { lastMove={from:targetMove.from,to:targetMove.to}; makeMove(targetMove); addMoveToList(targetMove);} selected=-1; legalForSelected=[]; draw(); return; }}
+    const p = G.board[sqIdx]; if(isPiece(p) && p.color===G.turn){ selected=sqIdx; legalForSelected=legalMovesFrom(selected); draw(); }
+  });
+
+  // ========= Promotion Modal =========
+  const promoModal = document.getElementById('promoModal');
+  let pendingPromotion = null;
+  function openPromotionModal(){ promoModal.classList.add('active'); }
+  function closePromotionModal(){ promoModal.classList.remove('active'); pendingPromotion=null; draw(); }
+  promoModal.addEventListener('click', (e)=>{ if(e.target===promoModal) closePromotionModal(); });
+  promoModal.querySelectorAll('.pieceBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!pendingPromotion) return;
+      const piece = btn.getAttribute('data-piece');
+      const move = {...pendingPromotion, promoted: piece};
+      lastMove = {from: move.from, to: move.to};
+      makeMove(move); addMoveToList(move);
+      closePromotionModal();
+    });
+  });
+
+  // ========= Side panel / controls =========
+  const statusEl = document.getElementById('status');
+  const checkEl = document.getElementById('checkState');
+  const capW = document.getElementById('capWhite');
+  const capB = document.getElementById('capBlack');
+  const moveList = document.getElementById('moveList');
+  const turnTag = document.getElementById('turnTag');
+
+  function updateStatus(){
+    capW.textContent = G.captured.w.join(' ');
+    capB.textContent = G.captured.b.join(' ');
+
+    const color = G.turn; const legal = generateAllLegalMoves();
+    let msg = color==='w' ? '백 차례' : '흑 차례';
+    if(legal.length===0){
+      if(inCheck(color)) { msg = (color==='w'?'백':'흑') + ' 체크메이트'; }
+      else { msg = '스테일메이트'; }
+    } else {
+      if(inCheck(color)) { msg += ' · 체크'; }
+    }
+    statusEl.textContent = msg;
+    checkEl.textContent = inCheck(color) ? (color==='w'?'백':'흑') + '이(가) 체크 상태' : '-';
+    turnTag.textContent = G.turn==='w' ? '백 차례' : '흑 차례';
+  }
+
+  function moveToSAN(m){
+    const piece = G.board[m.from]; if(!isPiece(piece)) return '';
+    const fromAlg = indexToAlgebraic(m.from); const toAlg = indexToAlgebraic(m.to);
+    let s='';
+    if(m.castle==='K' || m.castle==='k') s='O-O';
+    else if(m.castle==='Q' || m.castle==='q') s='O-O-O';
+    else {
+      s += (piece.type==='p'?'': piece.type.toUpperCase());
+      s += (m.capture||m.ep) ? (piece.type==='p'? fromAlg[0] : '') + 'x' : '';
+      s += toAlg;
+      if(m.promoted) s += '=' + m.promoted.toUpperCase();
+    }
+    // Simulate to append +/# safely without changing board
+    const keepLast = lastMove;
+    const moveCopy = {...m}; if(m.promoted) moveCopy.promoted = m.promoted;
+    makeMove(moveCopy);
+    const nextLegal = generateAllLegalMoves(); const check = inCheck(G.turn); const mate = nextLegal.length===0 && check;
+    undo();
+    lastMove = keepLast;
+    if(mate) s += '#'; else if(check) s += '+';
+    return s;
+  }
+
+  function addMoveToList(m){
+    const san = moveToSAN(m);
+    const liIndex = Math.ceil((moveList.querySelectorAll('li').length+1)/2);
+    if(G.turn==='b'){ // we just played white
+      const li = document.createElement('li');
+      li.innerHTML = `<strong>${liIndex}.</strong> ${san}`;
+      moveList.appendChild(li);
+    } else { // black played
+      const lastItem = moveList.lastElementChild; if(lastItem){ lastItem.innerHTML += ` \u2003 ${san}`; } else { const li=document.createElement('li'); li.innerHTML = `<strong>${liIndex}.</strong> ... ${san}`; moveList.appendChild(li); }
+    }
+    const movesBox = document.getElementById('moves'); movesBox.scrollTop = movesBox.scrollHeight;
+  }
+
+  document.getElementById('newBtn').addEventListener('click', ()=>{ loadFEN(START_FEN); moveList.innerHTML=''; lastMove=null; });
+  document.getElementById('undoBtn').addEventListener('click', ()=>{ undo(); if(moveList.lastElementChild){ // remove last SAN entry smartly
+      const li = moveList.lastElementChild; const parts = li.innerHTML.split(/\u2003/);
+      if(parts.length>1){ li.innerHTML = parts[0]; } else { moveList.removeChild(li); }
+    } });
+  document.getElementById('flipBtn').addEventListener('click', ()=>{ G.flipped=!G.flipped; draw(); });
+  document.getElementById('legalBtn').addEventListener('click', (e)=>{ G.showLegal=!G.showLegal; e.target.textContent = '합법 수 표시: ' + (G.showLegal?'켬':'끔'); draw(); });
+  document.getElementById('fenExportBtn').addEventListener('click', ()=>{ const fen=exportFEN(); navigator.clipboard.writeText(fen).then(()=>{ toast('FEN이 클립보드에 복사되었습니다.'); }); });
+  document.getElementById('fenImportBtn').addEventListener('click', ()=>{ const fen = prompt('불러올 FEN을 입력하세요:', exportFEN()); if(!fen) return; try{ loadFEN(fen); moveList.innerHTML=''; lastMove=null; toast('FEN 불러오기 완료'); }catch(err){ alert('잘못된 FEN입니다.'); } });
+
+  function toast(msg){
+    const t = document.createElement('div');
+    t.textContent = msg; t.style.position='fixed'; t.style.left='50%'; t.style.top='24px'; t.style.transform='translateX(-50%)'; t.style.background='rgba(0,0,0,0.7)'; t.style.padding='10px 14px'; t.style.border='1px solid rgba(255,255,255,0.2)'; t.style.borderRadius='10px'; t.style.zIndex=50; t.style.color='#fff'; t.style.fontWeight='600';
+    document.body.appendChild(t); setTimeout(()=>{ t.style.transition='opacity .4s ease'; t.style.opacity='0'; setTimeout(()=>t.remove(), 420); }, 900);
+  }
+
+  // ========= Init =========
+  loadFEN(START_FEN);
+  fitCanvas();
+
+  // ========= Minimal self-tests (콘솔 확인) =========
+  function assertNoThrow(name, fn){ try{ fn(); console.log('✅', name); } catch(e){ console.error('❌', name, e); } }
+
+  function runSelfTests(){
+    // 1) 기본 이동 e2e4
+    loadFEN(START_FEN);
+    const e2 = algebraicToIndex('e2'); const e4 = algebraicToIndex('e4');
+    const m1 = legalMovesFrom(e2).find(m=>m.to===e4);
+    assertNoThrow('e2-e4 make/undo', ()=>{ makeMove(m1); undo(); });
+
+    // 2) 캐슬링
+    loadFEN('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
+    const ke1 = algebraicToIndex('e1'); const g1 = algebraicToIndex('g1');
+    const castle = legalMovesFrom(ke1).find(m=>m.castle==='K' || m.to===g1);
+    assertNoThrow('White O-O make/undo', ()=>{ makeMove(castle); undo(); });
+
+    // 3) 프로모션
+    loadFEN('k7/P7/8/8/8/8/8/K7 w - - 0 1');
+    const a7 = algebraicToIndex('a7'); const a8 = algebraicToIndex('a8');
+    let prom = legalMovesFrom(a7).find(m=>m.to===a8);
+    prom = {...prom, promoted:'q'};
+    assertNoThrow('Promotion make/undo', ()=>{ makeMove(prom); undo(); });
+
+    // 4) 앙파상
+    loadFEN('8/8/8/3pP3/8/8/8/k6K w - d6 0 1');
+    const e5 = algebraicToIndex('e5');
+    const epm = legalMovesFrom(e5).find(m=>m.ep);
+    assertNoThrow('En passant make/undo', ()=>{ makeMove(epm); undo(); });
+
+    // 복구
+    loadFEN(START_FEN);
+  }
+  setTimeout(runSelfTests, 0);
+})();
+</script>
+</body>
+</html>

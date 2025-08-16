@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KHO Game — Canvas Snake</title>
+  <meta name="description" content="KHO Game: 브라우저에서 즐기는 캔버스 스네이크. 난이도 변경 시 즉시 새 게임으로 리셋, 속도 표시, 키보드/터치, 일시정지, 최고점 저장." />
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#151925; --text:#d7e1ff; --muted:#8aa0c2; --brand:#66a3ff; --accent:#89f7fe;
+      --grid:#101827; --snake:#66a3ff; --snake2:#89f7fe; --food:#ffd60a;
+      --dropdown-bg:#1a2030; --dropdown-border:rgba(255,255,255,.18);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:linear-gradient(160deg,#0b0d12,#0f1115 40%,#0b1020); color:var(--text);
+         font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px clamp(16px,4vw,28px);
+           background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0)); border-bottom:1px solid rgba(255,255,255,.06);
+           position:sticky;top:0;z-index:10;backdrop-filter:blur(6px)}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:36px;height:36px;border-radius:10px;background:radial-gradient(120% 120% at 20% 20%,var(--accent),var(--brand) 60%,#2e5bff 100%);
+          box-shadow:0 10px 30px rgba(102,163,255,.35), inset 0 0 24px rgba(255,255,255,.35)}
+    .title{font-weight:700;letter-spacing:.2px}
+    .subtitle{color:var(--muted);font-size:12px}
+    main{max-width:920px;margin:24px auto;padding:0 clamp(12px,3vw,24px)}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08);
+           border-radius:18px; padding:16px; box-shadow:0 10px 40px rgba(0,0,0,.4)}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .badge{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px;min-width:110px;text-align:center;font-weight:700}
+    .label{font-size:12px;color:var(--muted);display:block}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.05)); border:1px solid rgba(255,255,255,.12); color:var(--text);
+           padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;transition:transform .06s ease,border-color .2s ease,background .2s ease}
+    button:hover{transform:translateY(-1px); border-color:rgba(102,163,255,.6)}
+    .primary{background:linear-gradient(180deg,rgba(102,163,255,.35),rgba(102,163,255,.18));border-color:rgba(102,163,255,.55)}
+    /* 드롭다운 가시성 */
+    select, option, optgroup{background-color:var(--dropdown-bg); color:var(--text)}
+    select{border:1px solid var(--dropdown-border); border-radius:10px; padding:10px; appearance:none; -webkit-appearance:none; -moz-appearance:none}
+    select:focus{outline:none; box-shadow:0 0 0 2px rgba(102,163,255,.35)}
+    canvas#game{width:100%;aspect-ratio:1/1;display:block;background:var(--grid);border-radius:14px}
+    .hint{color:var(--muted);font-size:12px;margin-top:8px}
+    .overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);z-index:20}
+    .overlay.active{display:grid}
+    .card{background:var(--panel); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:16px; width:min(92vw,380px)}
+    .card h3{margin:0 0 8px 0}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <div class="title">KHO Game — Canvas Snake</div>
+        <div class="subtitle">서비스사: <strong>KHO</strong> · 캔버스 기반 아케이드</div>
+      </div>
+    </div>
+    <button class="primary" onclick="location.href='/'">메인으로</button>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="topbar">
+        <div class="stats">
+          <div class="badge"><span class="label">점수</span><span id="score">0</span></div>
+          <div class="badge"><span class="label">최고점</span><span id="best">0</span></div>
+          <div class="badge"><span class="label">상태</span><span id="status">일시정지</span></div>
+          <div class="badge"><span class="label">속도(난이도)</span><span id="speed">-</span></div>
+        </div>
+        <div class="controls">
+          <label class="label" style="margin-right:6px">난이도</label>
+          <select id="level" title="난이도 선택 시 새 게임으로 리셋됩니다">
+            <option value="slow">쉬움</option>
+            <option value="normal" selected>보통</option>
+            <option value="fast">어려움</option>
+            <option value="extreme">매우 어려움</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px" title="변경 시 새 게임으로 리셋됩니다"><input type="checkbox" id="wrap" checked />벽 통과</label>
+          <button id="pauseBtn">시작</button>
+          <button class="primary" id="newBtn">새 게임</button>
+        </div>
+      </div>
+      <canvas id="game" width="800" height="800" aria-label="Snake game canvas"></canvas>
+      <div class="hint">조작: ↑↓←→ 또는 WASD / 터치 스와이프 · <b>난이도/벽 통과</b> 변경 시 즉시 <b>새 게임</b>으로 전환됩니다.</div>
+    </section>
+  </main>
+
+  <div class="overlay" id="gameOver">
+    <div class="card">
+      <h3>게임 오버</h3>
+      <p id="finalScore">점수: 0</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button id="closeOver">닫기</button><button class="primary" id="retry">다시 하기</button></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  // ===== Canvas & layout =====
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const statusEl = document.getElementById('status');
+  const speedEl = document.getElementById('speed');
+  const levelSel = document.getElementById('level');
+  const wrapChk = document.getElementById('wrap');
+  const over = document.getElementById('gameOver');
+  const finalScore = document.getElementById('finalScore');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  let gridN = 22; // 22x22 grid
+  let pad = 18, gap = 4, cell; // cell size computed on resize
+  let running = false; let lastStep = 0; let stepMs = 110; // speed in ms per step
+  let wrapWalls = true;
+
+  let bestScore = parseInt(localStorage.getItem('kho_snake_best')||'0',10);
+  bestEl.textContent = bestScore;
+
+  function fit(){
+    const cssW = canvas.clientWidth || canvas.parentElement.clientWidth;
+    const w = Math.round(cssW * dpr);
+    canvas.width = w; canvas.height = w;
+    const inner = w - pad*2 - gap*(gridN-1);
+    cell = inner / gridN;
+    draw();
+  }
+  new ResizeObserver(fit).observe(canvas);
+
+  // ===== Game state =====
+  let snake, dir, food, score, pendingGrow, raf=0;
+
+  function reset(){
+    cancelAnimationFrame(raf);
+    const mid = Math.floor(gridN/2);
+    snake = [{r:mid, c:mid-1}, {r:mid, c:mid-2}, {r:mid, c:mid-3}];
+    dir = {r:0, c:1}; // start right
+    food = spawnFood();
+    score = 0; pendingGrow = 0; lastStep = 0; running = false;
+    statusEl.textContent = '일시정지';
+    updatePauseButton();
+    updateSpeedBadge();
+    draw();
+  }
+
+  function updateSpeedBadge(){
+    const name = levelSel.options[levelSel.selectedIndex].textContent;
+    const fps = Math.round(1000/stepMs);
+    speedEl.textContent = `${fps} FPS · ${name}`;
+  }
+
+  function spawnFood(){
+    const used = new Set(snake.map(p=>p.r+","+p.c));
+    let r, c; do { r = (Math.random()*gridN)|0; c = (Math.random()*gridN)|0; } while(used.has(r+","+c));
+    return {r,c};
+  }
+
+  function setLevel(){
+    const v = levelSel.value;
+    stepMs = v==='slow'?150 : v==='normal'?110 : v==='fast'?80 : 60;
+    wrapWalls = wrapChk.checked;
+    updateSpeedBadge();
+  }
+
+  // ===== Logic =====
+  function step(t){
+    raf = requestAnimationFrame(step);
+    if(!running){ lastStep=t; return; }
+    if(t - lastStep < stepMs) return; lastStep = t;
+
+    let nr = snake[0].r + dir.r; let nc = snake[0].c + dir.c;
+    if(wrapWalls){
+      if(nr<0) nr = gridN-1; if(nr>=gridN) nr=0; if(nc<0) nc=gridN-1; if(nc>=gridN) nc=0;
+    } else {
+      if(nr<0||nr>=gridN||nc<0||nc>=gridN){ return gameOver(); }
+    }
+
+    const tailFree = pendingGrow===0 ? snake[snake.length-1] : null;
+    for(let i=0;i<snake.length;i++){
+      const s = snake[i];
+      if(tailFree && s===tailFree) continue;
+      if(s.r===nr && s.c===nc){ return gameOver(); }
+    }
+
+    snake.unshift({r:nr, c:nc});
+    if(nr===food.r && nc===food.c){
+      score += 10; scoreEl.textContent = score; pendingGrow += 1; food = spawnFood();
+    }
+
+    if(pendingGrow>0){ pendingGrow--; } else { snake.pop(); }
+
+    draw();
+  }
+
+  function gameOver(){
+    running=false; statusEl.textContent='게임 오버'; updatePauseButton();
+    finalScore.textContent = `점수: ${score}`;
+    over.classList.add('active');
+    if(score>bestScore){ bestScore=score; localStorage.setItem('kho_snake_best', String(bestScore)); bestEl.textContent=bestScore; }
+  }
+
+  // ===== Rendering =====
+  function draw(){
+    if(!cell){ return; }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid');
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    const start = pad, g = gap;
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    for(let r=0;r<gridN;r++){
+      for(let c=0;c<gridN;c++){
+        const x = start + c*(cell+g), y = start + r*(cell+g);
+        ctx.fillRect(x, y, cell, cell);
+      }
+    }
+
+    drawFood(food.r, food.c);
+
+    for(let i=snake.length-1;i>=0;i--){
+      const s = snake[i];
+      const head = (i===0);
+      drawSnakeCell(s.r, s.c, head);
+    }
+
+    if(!running){
+      ctx.save();
+      ctx.fillStyle='rgba(0,0,0,0.45)';
+      ctx.font = (canvas.width*0.05) + 'px ui-sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('일시정지 (Space)', canvas.width/2, canvas.height/2);
+      ctx.restore();
+    }
+  }
+
+  function cellXY(r,c){ const x = pad + c*(cell+gap) + 1; const y = pad + r*(cell+gap) + 1; return [x,y]; }
+
+  function drawSnakeCell(r,c, isHead){
+    const [x,y]=cellXY(r,c);
+    // ✅ 반지름과 크기를 안전하게 클램프 (음수 금지) + 변수명 충돌 방지
+    const radBase = Math.max(0, 8 * (canvas.width/800));
+    const w = Math.max(1, cell-2);
+    const h = Math.max(1, cell-2);
+    const radius = Math.min(radBase, w/2, h/2);
+
+    const grd = ctx.createLinearGradient(x,y,x+w,y+h);
+    grd.addColorStop(0, getCss('--snake'));
+    grd.addColorStop(1, getCss('--snake2'));
+    roundRect(x,y,w,h, radius);
+    ctx.fillStyle = grd; ctx.fill();
+    if(isHead){
+      ctx.lineWidth = 2; ctx.strokeStyle='rgba(0,0,0,0.25)';
+      ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.max(2,Math.min(w,h)*0.12), 0, Math.PI*2); ctx.stroke();
+    }
+  }
+
+  function drawFood(r,c){
+    const [x,y]=cellXY(r,c);
+    const rad = Math.max(4, cell*0.12);
+    ctx.beginPath(); ctx.arc(x+cell/2, y+cell/2, rad, 0, Math.PI*2);
+    ctx.fillStyle = getCss('--food');
+    ctx.shadowColor = 'rgba(255,214,10,0.45)'; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // ✅ roundRect에서도 반지름/크기 클램프 적용
+  function roundRect(x,y,w,h,r){
+    w = Math.max(0, w); h = Math.max(0, h);
+    r = Math.max(0, Math.min(r, w/2, h/2));
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+  function getCss(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  // ===== Input =====
+  function dirFromKey(k){ if(k==='ArrowUp'||k==='w'||k==='W') return {r:-1,c:0}; if(k==='ArrowDown'||k==='s'||k==='S') return {r:1,c:0}; if(k==='ArrowLeft'||k==='a'||k==='A') return {r:0,c:-1}; if(k==='ArrowRight'||k==='d'||k==='D') return {r:0,c:1}; return null; }
+  function canTurn(to){ return !(dir.r + to.r === 0 && dir.c + to.c === 0); }
+
+  window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ togglePause(); return; } const d = dirFromKey(e.key); if(d && canTurn(d)){ dir = d; if(!running){ draw(); } } });
+  let touchX=0, touchY=0, swiping=false;
+  canvas.addEventListener('touchstart', (e)=>{ if(e.touches.length){ const t=e.touches[0]; touchX=t.clientX; touchY=t.clientY; swiping=true; }});
+  canvas.addEventListener('touchmove', (e)=>{ if(!swiping) return; const t=e.touches[0]; const dx=t.clientX-touchX, dy=t.clientY-touchY; if(Math.hypot(dx,dy)>24){ const d = Math.abs(dx)>Math.abs(dy) ? (dx>0?{r:0,c:1}:{r:0,c:-1}) : (dy>0?{r:1,c:0}:{r:-1,c:0}); if(canTurn(d)) dir=d; swiping=false; } });
+  canvas.addEventListener('touchend', ()=>{ swiping=false; });
+
+  // Buttons & settings
+  pauseBtn.addEventListener('click', togglePause);
+  document.getElementById('newBtn').addEventListener('click', ()=>{ reset(); draw(); });
+  document.getElementById('retry').addEventListener('click', ()=>{ over.classList.remove('active'); setLevel(); reset(); running=true; statusEl.textContent='플레이 중'; updatePauseButton(); requestAnimationFrame(step); });
+  document.getElementById('closeOver').addEventListener('click', ()=>{ over.classList.remove('active'); });
+
+  // ✅ 난이도/벽통과 변경 시 즉시 새 게임으로 리셋
+  levelSel.addEventListener('change', ()=>{ setLevel(); reset(); });
+  wrapChk.addEventListener('change', ()=>{ setLevel(); reset(); });
+
+  function updatePauseButton(){ if(statusEl.textContent==='게임 오버'){ pauseBtn.textContent='재개'; return; } if(running){ pauseBtn.textContent='일시정지'; } else { pauseBtn.textContent = score>0 ? '재개' : '시작'; } }
+  function togglePause(){ running=!running; statusEl.textContent = running? '플레이 중':'일시정지'; updatePauseButton(); if(running) requestAnimationFrame(step); }
+
+  // ===== Init =====
+  setLevel(); reset(); fit(); draw();
+
+  // ===== Self-tests =====
+  function assert(name, cond){ if(cond){ console.log('✅', name); } else { console.error('❌', name);} }
+  (function selfTests(){
+    // 기존 테스트 유지
+    dir={r:0,c:1}; assert('역방향 금지', !canTurn({r:0,c:-1}));
+    const tmpFood = spawnFood(); const clash = snake.some(s=>s.r===tmpFood.r && s.c===tmpFood.c); assert('음식 겹치지 않음', !clash);
+
+    // 추가 테스트 1: roundRect 음수 반지름 방지
+    try{ roundRect(0,0,10,10,-5); assert('roundRect 음수 반지름 clamp', true); } catch(e){ assert('roundRect 음수 반지름 clamp', false); }
+
+    // 추가 테스트 2: 아주 작은 셀에서도 drawSnakeCell 예외 없음
+    try{ const oldCell = cell; cell = 1; drawSnakeCell(0,0,false); cell = oldCell; assert('작은 셀에서도 렌더 안전', true); }
+    catch(e){ assert('작은 셀에서도 렌더 안전', false); }
+
+    // 추가 테스트 3: 난이도 변경 시 리셋되어 일시정지 상태
+    const oldVal = levelSel.value; levelSel.value = 'extreme'; setLevel(); reset();
+    assert('난이도 변경 리셋시 일시정지', statusEl.textContent==='일시정지' && !running);
+    levelSel.value = oldVal; setLevel(); reset();
+
+    // 추가 테스트 4: drawSnakeCell 파라미터 이름(r)과 내부 변수 충돌 없음
+    try{ drawSnakeCell(0,0,true); assert('drawSnakeCell 변수 충돌 없음', true); }
+    catch(e){ assert('drawSnakeCell 변수 충돌 없음', false); }
+  })();
+})();
+</script>
+</body>
+</html>

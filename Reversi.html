@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>KHO Game — Canvas Reversi (Othello)</title>
+  <style>
+    body { background:#2e2e2e; color:#eee; font-family:sans-serif; text-align:center; }
+    #gameCanvas { background:#006400; margin-top:10px; border:4px solid #333; }
+    .controls { margin:10px; }
+    button, select { margin:5px; padding:6px 12px; border-radius:6px; border:none; cursor:pointer; }
+    button:hover, select:hover { opacity:0.8; }
+    h1 { color:#fff; }
+    #status { margin-top:10px; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <h1>KHO Game — Reversi</h1>
+  <div class="controls">
+    <button id="newGame">새 게임</button>
+    <button id="undo">무르기</button>
+    <select id="aiSelect">
+      <option value="none">AI 없음</option>
+      <option value="black">AI=흑</option>
+      <option value="white">AI=백</option>
+    </select>
+  </div>
+  <canvas id="gameCanvas" width="480" height="480"></canvas>
+  <div id="status"></div>
+  <script>
+    const canvas=document.getElementById('gameCanvas');
+    const ctx=canvas.getContext('2d');
+    const SIZE=8; const CELL=canvas.width/SIZE;
+    let board,turn,history,aiColor="none";
+
+    function init(){
+      board=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
+      let m=SIZE/2; board[m-1][m-1]=board[m][m]=2; board[m-1][m]=board[m][m-1]=1;
+      turn=1; history=[];
+      draw(); updateStatus();
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // 보드
+      ctx.strokeStyle="#000";
+      for(let i=0;i<=SIZE;i++){
+        ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,canvas.height);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(canvas.width,i*CELL);ctx.stroke();
+      }
+      // 돌
+      for(let r=0;r<SIZE;r++){
+        for(let c=0;c<SIZE;c++){
+          if(board[r][c]){
+            let grad=ctx.createRadialGradient(c*CELL+CELL/2-5,r*CELL+CELL/2-5,5,c*CELL+CELL/2,r*CELL+CELL/2,CELL/2);
+            if(board[r][c]==1){grad.addColorStop(0,"#555");grad.addColorStop(1,"#000");}
+            else {grad.addColorStop(0,"#fff");grad.addColorStop(1,"#ccc");}
+            ctx.beginPath();ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,CELL/2-6,0,2*Math.PI);
+            ctx.fillStyle=grad;ctx.fill();ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function inside(r,c){return r>=0&&c>=0&&r<SIZE&&c<SIZE;}
+    function moves(color){
+      let res=[];
+      for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++) if(board[r][c]==0){
+        let flips=[];
+        for(let [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]]){
+          let rr=r+dr,cc=c+dc,tmp=[];
+          while(inside(rr,cc)&&board[rr][cc]==3-color){tmp.push([rr,cc]);rr+=dr;cc+=dc;}
+          if(inside(rr,cc)&&board[rr][cc]==color&&tmp.length)flips.push(...tmp);
+        }
+        if(flips.length)res.push({r,c,flips});
+      }
+      return res;
+    }
+
+    function play(r,c){
+      let ms=moves(turn).filter(m=>m.r==r&&m.c==c);
+      if(ms.length){
+        history.push(JSON.parse(JSON.stringify(board)));
+        board[r][c]=turn; for(let [rr,cc] of ms[0].flips)board[rr][cc]=turn;
+        turn=3-turn;
+        draw(); updateStatus();
+        checkAITurn();
+      }
+    }
+
+    function updateStatus(){
+      let black=board.flat().filter(x=>x==1).length;
+      let white=board.flat().filter(x=>x==2).length;
+      document.getElementById('status').textContent=`흑:${black} 백:${white} · 차례:${turn==1?"흑":"백"}`;
+    }
+
+    function aiMove(){
+      let ms=moves(turn);
+      if(!ms.length){turn=3-turn;updateStatus();return;}
+      let m=ms[Math.floor(Math.random()*ms.length)];
+      play(m.r,m.c);
+    }
+
+    function checkAITurn(){
+      if((aiColor=="black"&&turn==1)||(aiColor=="white"&&turn==2)){
+        document.getElementById('status').textContent += " · AI 생각중...";
+        setTimeout(aiMove, 1500);
+      }
+    }
+
+    canvas.addEventListener('click',e=>{
+      let c=Math.floor(e.offsetX/CELL), r=Math.floor(e.offsetY/CELL);
+      play(r,c);
+    });
+
+    document.getElementById('newGame').onclick=init;
+    document.getElementById('undo').onclick=()=>{if(history.length){board=history.pop();turn=3-turn;draw();updateStatus();}};
+    document.getElementById('aiSelect').onchange=e=>{aiColor=e.target.value;checkAITurn();};
+
+    init();
+  </script>
+</body>
+</html>

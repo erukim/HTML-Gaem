@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KHO Game — Canvas Breakout</title>
+  <meta name="description" content="KHO Game: 캔버스 브레이크아웃. 키보드/터치, 레벨, 파워업, 점수·목숨, 일시정지/새 게임, 반응형 캔버스." />
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#151925; --text:#d7e1ff; --muted:#8aa0c2; --brand:#66a3ff; --accent:#89f7fe; --danger:#ff6b6b;
+      --grid:#101827; --brick1:#6ea8fe; --brick2:#7bdff7; --brick3:#f6bd60; --brick4:#f28482; --paddle:#e5edff; --ball:#ffffff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(160deg,#0b0d12,#0f1115 40%,#0b1020);color:var(--text);
+      font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px clamp(16px,4vw,28px);
+      background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0));border-bottom:1px solid rgba(255,255,255,.06);
+      position:sticky;top:0;z-index:10;backdrop-filter:blur(6px)}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:36px;height:36px;border-radius:10px;background:radial-gradient(120% 120% at 20% 20%,var(--accent),var(--brand) 60%,#2e5bff 100%);
+      box-shadow:0 10px 30px rgba(102,163,255,.35), inset 0 0 24px rgba(255,255,255,.35)}
+    .title{font-weight:700;letter-spacing:.2px}
+    .subtitle{color:var(--muted);font-size:12px}
+    main{max-width:920px;margin:24px auto;padding:0 clamp(12px,3vw,24px)}
+    .panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .badge{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px;min-width:110px;text-align:center;font-weight:700}
+    .label{font-size:12px;color:var(--muted);display:block}
+    button{background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.12);color:var(--text);
+      padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700;transition:transform .06s ease,border-color .2s ease,background .2s ease}
+    button:hover{transform:translateY(-1px);border-color:rgba(102,163,255,.6)}
+    .primary{background:linear-gradient(180deg,rgba(102,163,255,.35),rgba(102,163,255,.18));border-color:rgba(102,163,255,.55)}
+    #game{width:100%;aspect-ratio:16/9;display:block;background:var(--grid);border-radius:14px}
+    .hint{color:var(--muted);font-size:12px;margin-top:8px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <div class="title">KHO Game — Canvas Breakout</div>
+        <div class="subtitle">서비스사: <strong>KHO</strong> · 캔버스 기반 브릭 파괴 게임</div>
+      </div>
+    </div>
+    <button class="primary" onclick="location.href='/'">메인으로</button>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="topbar">
+        <div class="stats">
+          <div class="badge"><span class="label">점수</span><span id="score">0</span></div>
+          <div class="badge"><span class="label">목숨</span><span id="lives">3</span></div>
+          <div class="badge"><span class="label">레벨</span><span id="level">1</span></div>
+          <div class="badge"><span class="label">상태</span><span id="status">일시정지</span></div>
+        </div>
+        <div>
+          <button id="pauseBtn">시작</button>
+          <button class="primary" id="newBtn">새 게임</button>
+        </div>
+      </div>
+      <canvas id="game" width="960" height="540" aria-label="Breakout canvas"></canvas>
+      <div class="hint">조작: ← → 또는 A/D / 터치 드래그 · 공을 놓치면 목숨이 줄어듭니다. 모든 벽돌을 부수면 다음 레벨로 진행!</div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const levelEl = document.getElementById('level');
+  const statusEl = document.getElementById('status');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  let W=960, H=540; // internal size
+  function fit(){
+    const cssW = canvas.clientWidth || canvas.parentElement.clientWidth;
+    const cssH = cssW / (16/9);
+    const w = Math.round(cssW * dpr); const h = Math.round(cssH * dpr);
+    canvas.width = w; canvas.height = h; W = w; H = h; draw();
+  }
+  new ResizeObserver(fit).observe(canvas);
+
+  // Game State
+  let score, lives, level, running=false, raf=0, last=0;
+  const paddle = { x: 0, y: 0, w: 0, h: 0, speed: 0 };
+  const balls = []; // {x,y,vx,vy,r}
+  let bricks = []; // {x,y,w,h,hp,color}
+  let powerups = []; // {x,y,vx,vy,type}
+
+  const COLORS = [getCss('--brick1'), getCss('--brick2'), getCss('--brick3'), getCss('--brick4')];
+
+  function resetAll(){
+    cancelAnimationFrame(raf); running=false; statusEl.textContent='일시정지'; pauseBtn.textContent='시작';
+    score=0; lives=3; level=1; updateHud();
+    setupLevel(level);
+    draw();
+  }
+
+  function setupLevel(n){
+    // paddle
+    paddle.w = Math.max(60, W*0.14); paddle.h = Math.max(10, H*0.02);
+    paddle.x = (W-paddle.w)/2; paddle.y = H - paddle.h - Math.max(20, H*0.04); paddle.speed = Math.max(220, W*0.45);
+    // ball
+    balls.length = 0; const r = Math.max(5, Math.min(14, W*0.012));
+    balls.push({ x: W/2, y: paddle.y - r - 2, vx: (Math.random()<0.5?-1:1)*Math.max(180,W*0.25), vy: -Math.max(200,W*0.28), r });
+    // bricks grid
+    const cols = 12, rows = 6 + Math.min(3, n-1); // add rows with level
+    const gap = Math.max(4, W*0.004), top = Math.max(40, H*0.08), side = Math.max(20, W*0.02);
+    const bw = (W - side*2 - gap*(cols-1)) / cols; const bh = Math.max(14, H*0.04);
+    bricks = [];
+    for(let rI=0;rI<rows;rI++){
+      for(let cI=0;cI<cols;cI++){
+        const hp = 1 + (rI%4===0?2:0) + Math.floor((n-1)/2); // tougher at higher levels
+        const color = COLORS[(rI+cI)%COLORS.length];
+        bricks.push({x: side + cI*(bw+gap), y: top + rI*(bh+gap), w:bw, h:bh, hp, color});
+      }
+    }
+    powerups.length=0;
+  }
+
+  function updateHud(){ scoreEl.textContent=score; livesEl.textContent=lives; levelEl.textContent=level; }
+  function getCss(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  // Loop
+  function step(t){
+    raf = requestAnimationFrame(step); if(!running){ last=t; return; }
+    const dt = Math.min(1/30, (t-last)/1000); last=t; // clamp dt for stability
+
+    // Balls
+    for(const b of balls){
+      b.x += b.vx*dt; b.y += b.vy*dt;
+      // walls
+      if(b.x - b.r < 0){ b.x = b.r; b.vx *= -1; }
+      if(b.x + b.r > W){ b.x = W - b.r; b.vx *= -1; }
+      if(b.y - b.r < 0){ b.y = b.r; b.vy *= -1; }
+      // paddle collision
+      if(b.y + b.r >= paddle.y && b.y + b.r <= paddle.y + paddle.h && b.x >= paddle.x && b.x <= paddle.x + paddle.w && b.vy>0){
+        const hit = (b.x - (paddle.x + paddle.w/2)) / (paddle.w/2); // -1..1
+        const ang = hit * (Math.PI/3); // reflect up to ~60deg
+        const speed = Math.hypot(b.vx,b.vy) * 1.02; // slight acceleration
+        b.vx = speed * Math.sin(ang);
+        b.vy = -Math.abs(speed * Math.cos(ang));
+        b.y = paddle.y - b.r - 1;
+      }
+    }
+
+    // Brick collisions (AABB vs circle)
+    for(const b of balls){
+      for(const br of bricks){ if(br.hp<=0) continue; 
+        const cx = Math.max(br.x, Math.min(b.x, br.x+br.w));
+        const cy = Math.max(br.y, Math.min(b.y, br.y+br.h));
+        const dx = b.x - cx, dy = b.y - cy; if(dx*dx + dy*dy <= b.r*b.r){
+          // decide reflection axis
+          const overlapX = Math.min(Math.abs(b.x-(br.x)) , Math.abs(b.x-(br.x+br.w)));
+          const overlapY = Math.min(Math.abs(b.y-(br.y)) , Math.abs(b.y-(br.y+br.h)));
+          if(overlapX < overlapY) b.vx *= -1; else b.vy *= -1;
+          br.hp--; score += 10; if(Math.random()<0.08) spawnPower(br.x+br.w/2, br.y+br.h/2); // 8% powerup
+        }
+      }
+    }
+
+    // Remove dead bricks
+    bricks = bricks.filter(bk => bk.hp>0);
+
+    // Powerups fall
+    for(const p of powerups){ p.y += 140*dt; if(p.y>H + 30) p.dead=true; // out
+      if(p.y>=paddle.y && p.x>=paddle.x && p.x<=paddle.x+paddle.w && p.y<=paddle.y+paddle.h){
+        applyPower(p.type); p.dead=true;
+      }
+    }
+    powerups = powerups.filter(p=>!p.dead);
+
+    // Lose life when ball falls
+    for(const b of balls){ if(b.y - b.r > H){ b.dead=true; } }
+    // If all balls dead -> life--
+    if(balls.every(b=>b.dead)){
+      lives--; updateHud(); if(lives<=0){ running=false; statusEl.textContent='게임 오버'; pauseBtn.textContent='재시작'; setupLevel(level); }
+      else { setupLevel(level); } // reset balls & paddle, keep bricks
+    }
+    for(let i=balls.length-1;i>=0;i--) if(balls[i].dead) balls.splice(i,1);
+
+    // Next level when bricks cleared
+    if(bricks.length===0){ level++; updateHud(); setupLevel(level); }
+
+    draw();
+  }
+
+  function spawnPower(x,y){
+    const types=['widen','life','slow','multi'];
+    const type = types[(Math.random()*types.length)|0];
+    powerups.push({x,y,vx:0,vy:120,type});
+  }
+  function applyPower(t){
+    if(t==='widen') paddle.w *= 1.22;
+    else if(t==='life'){ lives++; updateHud(); }
+    else if(t==='slow'){ for(const b of balls){ b.vx*=0.85; b.vy*=0.85; } }
+    else if(t==='multi'){
+      // duplicate first ball
+      if(balls.length){ const b=balls[0]; balls.push({x:b.x,y:b.y,vx:-b.vx,vy:b.vy,r:b.r}); }
+    }
+  }
+
+  // Rendering
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // background grid tint
+    ctx.fillStyle=getCss('--grid'); ctx.fillRect(0,0,W,H);
+
+    // bricks
+    for(const br of bricks){
+      const alpha = Math.min(1, 0.6 + 0.1*br.hp);
+      ctx.fillStyle = withAlpha(br.color, alpha); roundRect(br.x, br.y, br.w, br.h, 6*(W/960)); ctx.fill();
+    }
+
+    // paddle
+    ctx.fillStyle=getCss('--paddle'); roundRect(paddle.x, paddle.y, paddle.w, paddle.h, 8*(W/960)); ctx.fill();
+
+    // balls
+    ctx.fillStyle=getCss('--ball'); for(const b of balls){ ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fill(); }
+
+    // powerups
+    for(const p of powerups){ drawPower(p); }
+
+    // paused text
+    if(!running){ ctx.save(); ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.font=(W*0.05)+'px ui-sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('일시정지 (Space)', W/2, H/2); ctx.restore(); }
+  }
+
+  function drawPower(p){
+    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.fillStyle='rgba(255,255,255,0.85)'; roundRect(-16, -10, 32, 20, 6); ctx.fill();
+    ctx.fillStyle='#0f172a'; ctx.font='12px ui-sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const label = p.type==='widen'? '↔' : p.type==='life'? '❤' : p.type==='slow'? '⏱' : '×2';
+    ctx.fillText(label, 0, 1);
+    ctx.restore();
+  }
+
+  function roundRect(x,y,w,h,r){ r=Math.max(0,Math.min(r,Math.min(w,h)/2)); ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function withAlpha(hex, a){
+    // hex like #RRGGBB
+    const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  // Input
+  let moveDir=0; // -1 left, 1 right
+  window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ togglePause(); } if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A'){ moveDir=-1; } if(e.key==='ArrowRight' || e.key==='d' || e.key==='D'){ moveDir=1; } });
+  window.addEventListener('keyup', (e)=>{ if(['ArrowLeft','ArrowRight','a','A','d','D'].includes(e.key)){ moveDir=0; } });
+
+  // Touch drag
+  let dragging=false; let lastX=0;
+  canvas.addEventListener('touchstart', (e)=>{ if(e.touches.length){ dragging=true; lastX=e.touches[0].clientX; }});
+  canvas.addEventListener('touchmove', (e)=>{ if(!dragging) return; const x=e.touches[0].clientX; const dx=x-lastX; lastX=x; paddle.x += dx*dpr; limitPaddle(); });
+  canvas.addEventListener('touchend', ()=>{ dragging=false; });
+
+  // Buttons
+  document.getElementById('newBtn').addEventListener('click', ()=>{ resetAll(); });
+  pauseBtn.addEventListener('click', togglePause);
+
+  function togglePause(){ running=!running; statusEl.textContent=running?'플레이 중':'일시정지'; pauseBtn.textContent=running?'일시정지':'시작'; if(running) requestAnimationFrame(step); }
+
+  // Paddle movement by dir
+  function tickPaddle(dt){ if(moveDir!==0){ paddle.x += moveDir * paddle.speed * dt; limitPaddle(); } }
+  function limitPaddle(){ paddle.x = Math.max(0, Math.min(W-paddle.w, paddle.x)); }
+
+  // Hook paddle movement into main step via wrapper
+  const _step = step; step = function(t){ const prev = last; _step(t); const dt = Math.min(1/30, (t-prev)/1000); if(running) tickPaddle(dt); };
+
+  // Init
+  resetAll(); fit(); draw(); requestAnimationFrame(step);
+
+  // ===== Self tests (console) =====
+  function assert(name, cond){ if(cond){ console.log('✅', name); } else { console.error('❌', name); } }
+  (function selfTests(){
+    // 1. 라운드 사각형 반지름 음수 아님
+    try{ roundRect(0,0,10,10,-5); assert('roundRect clamps radius', true);}catch(e){ assert('roundRect clamps radius', false); }
+    // 2. 패들 제한
+    paddle.x=-100; limitPaddle(); assert('패들 왼쪽 경계', paddle.x===0);
+    paddle.x=W+100; limitPaddle(); assert('패들 오른쪽 경계', paddle.x===W-paddle.w);
+    // 3. 파워업 적용
+    const bCount=balls.length; applyPower('multi'); assert('멀티볼 생성', balls.length>=bCount);
+  })();
+})();
+</script>
+</body>
+</html>
