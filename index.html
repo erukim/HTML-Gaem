@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>KHO Gaem — HTML 게임 모음</title>
+  <meta name="description" content="KHO Gaem: 브라우저에서 바로 즐기는 HTML 게임 모음. 검색·장르 필터·즐겨찾기·다크모드 지원." />
+  <link rel="canonical" href="https://gaem.kho.kr/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://gaem.kho.kr/">
+  <meta property="og:site_name" content="KHO Gaem">
+  <meta property="og:title" content="KHO Gaem — HTML 게임 모음">
+  <meta property="og:description" content="브라우저에서 바로 즐기는 HTML 게임 컬렉션. 검색, 장르 필터, 즐겨찾기 지원.">
+  <!-- og:image은 나중에 교체 가능 -->
+  <meta property="og:image" content="https://gaem.kho.kr/og.png">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="KHO Gaem">
+  <meta name="twitter:description" content="브라우저에서 바로 즐기는 HTML 게임 컬렉션.">
+  <meta name="twitter:image" content="https://gaem.kho.kr/og.png">
+
+  <!-- Favicon (data URI, 필요 시 교체) -->
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="%230b5bfa"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="30" font-family="Arial" fill="white">K</text></svg>'>
+
+  <meta name="theme-color" content="#0b5bfa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)">
+
+  <style>
+    /* ---------- 기본 설정 ---------- */
+    :root{
+      --bg: #0b0c10;
+      --panel: #111827;
+      --muted: #9aa4b2;
+      --text: #e5e7eb;
+      --brand: #0b5bfa;
+      --brand-2: #4f46e5;
+      --ok: #22c55e;
+      --warn:#fbbf24;
+      --card:#0f172a;
+      --chip:#1f2937;
+      --chip-on:#0b5bfa22;
+      --ring: 0 0 0 3px #0b5bfa55;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 14px;
+      --radius-sm:10px;
+      --gap: 16px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, Noto Sans KR, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f7f8fb; --panel:#ffffff; --muted:#6b7280; --text:#0f172a;
+        --card:#ffffff; --chip:#f1f5f9; --chip-on:#0b5bfa1a;
+        --shadow: 0 10px 25px rgba(2,6,23,.08);
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text); font-family:var(--font);
+      -webkit-font-smoothing:antialiased; line-height:1.45;
+    }
+    a{color:inherit; text-decoration:none}
+    .container{max-width:1100px; margin:0 auto; padding: 20px}
+    .visually-hidden{position:absolute!important; height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px)}
+
+    /* ---------- 헤더 ---------- */
+    header{
+      position:sticky; top:0; z-index:50; backdrop-filter:saturate(1.3) blur(10px);
+      background: color-mix(in oklab, var(--bg) 85%, transparent);
+      border-bottom: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+    }
+    .topbar{
+      display:flex; align-items:center; gap:12px; padding: 14px 20px;
+    }
+    .logo{
+      display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px;
+    }
+    .logo-badge{
+      width:34px; height:34px; border-radius:10px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      display:grid; place-items:center; color:#fff; font-weight:900;
+      box-shadow: var(--shadow);
+    }
+    .brand{font-size:18px}
+    .spacer{flex:1}
+
+    .icon-btn{
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:var(--panel);
+      padding:10px 12px; border-radius:10px; cursor:pointer;
+      display:flex; align-items:center; gap:8px; color:var(--text);
+    }
+    .icon-btn:hover{filter:brightness(1.05)}
+    .icon-btn:focus-visible{outline:none; box-shadow: var(--ring)}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; border:1px solid color-mix(in oklab, var(--text) 20%, transparent); padding:0 6px; border-radius:6px; font-size:12px; color:var(--muted)}
+
+    /* ---------- 히어로 / 툴바 ---------- */
+    .hero{padding: 26px 20px 8px}
+    .hero h1{margin:0 0 8px; font-size:clamp(26px, 3vw, 36px)}
+    .hero p{margin:0; color:var(--muted)}
+
+    .toolbar{
+      margin-top:16px; display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+    }
+    .search{
+      flex:1 1 320px; position:relative;
+    }
+    .search input{
+      width:100%; padding:14px 44px 14px 44px; border-radius:12px;
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:var(--panel); color:var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+    }
+    .search input:focus{outline:none; box-shadow: var(--ring)}
+    .search .s-icon{position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.7}
+    .search .k{position:absolute; right:10px; top:50%; transform:translateY(-50%)}
+
+    .select{
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:var(--panel); color:var(--text); padding:12px 14px; border-radius:12px;
+    }
+    .chips{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{
+      padding:10px 12px; border-radius:999px; background:var(--chip); color:var(--text);
+      border:1px solid color-mix(in oklab, var(--text) 10%, transparent); cursor:pointer; font-weight:600;
+    }
+    .chip[data-active="true"]{ background:var(--chip-on); border-color: color-mix(in oklab, var(--brand) 70%, transparent) }
+
+    /* ---------- 카드 그리드 ---------- */
+    .grid{
+      display:grid; gap:16px; margin-top:18px;
+      grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+    }
+    .card{
+      background:var(--card); border-radius: var(--radius); overflow:hidden; border:1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      box-shadow: var(--shadow); display:flex; flex-direction:column; min-height:260px;
+    }
+    .thumb{
+      aspect-ratio: 16/10; background:#0f172a; position:relative; overflow:hidden;
+    }
+    .thumb img{width:100%; height:100%; object-fit:cover; display:block}
+    .badge-row{
+      position:absolute; left:10px; top:10px; display:flex; gap:6px; flex-wrap:wrap;
+    }
+    .badge{
+      padding:6px 8px; border-radius:999px; font-size:12px; background:rgba(0,0,0,.5); color:#fff; border:1px solid rgba(255,255,255,.15)
+    }
+    .favorite{
+      position:absolute; right:10px; top:10px; background:rgba(0,0,0,.45); color:#fff; border:1px solid rgba(255,255,255,.15);
+      border-radius:999px; padding:6px 8px; cursor:pointer;
+    }
+    .favorite[aria-pressed="true"]{ background: #f59e0b; color:#111; border-color:#0000 }
+    .card-body{padding:14px; display:flex; flex-direction:column; gap:10px; flex:1}
+    .title {
+      font-weight: 800;
+      font-size: clamp(14px, 2vw, 18px); /* 글자가 많아지면 자동 축소 */
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+    .meta{color:var(--muted); font-size:13px}
+    .cta{
+      margin-top:auto; display:flex; gap:8px
+    }
+    .btn{
+      flex:1; padding:10px 12px; border-radius:10px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 80%, #fff 5%), var(--panel));
+      color:var(--text); cursor:pointer; text-align:center; font-weight:700;
+    }
+    .btn.play{ background: linear-gradient(135deg, var(--brand), var(--brand-2)); color:#fff; border-color: #0000 }
+    .btn:hover{ filter:brightness(1.03) }
+    .btn:focus-visible{ outline:none; box-shadow: var(--ring) }
+
+    /* ---------- 푸터 ---------- */
+    footer{
+      margin:36px 0 60px; color:var(--muted);
+      border-top:1px dashed color-mix(in oklab, var(--text) 12%, transparent);
+      padding-top:16px;
+    }
+
+    /* ---------- 유틸 ---------- */
+    .empty{ text-align:center; color:var(--muted); padding:40px 0 }
+    .count{ color:var(--muted); font-size:14px }
+    
+    /* === 강제 테마(토글용) — 맨 아래 두어 우선순위 높임 === */
+    html[data-theme="dark"]{
+      --bg: #0b0c10;
+      --panel: #111827;
+      --muted: #9aa4b2;
+      --text: #e5e7eb;
+      --brand: #0b5bfa;
+      --brand-2: #4f46e5;
+      --ok: #22c55e;
+      --warn:#fbbf24;
+      --card:#0f172a;
+      --chip:#1f2937;
+      --chip-on:#0b5bfa22;
+      --ring: 0 0 0 3px #0b5bfa55;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+
+    html[data-theme="light"]{
+      --bg:#f7f8fb;
+      --panel:#ffffff;
+      --muted:#6b7280;
+      --text:#0f172a;
+      --card:#ffffff;
+      --chip:#f1f5f9;
+      --chip-on:#0b5bfa1a;
+      --shadow: 0 10px 25px rgba(2,6,23,.08);
+    }
+  </style>
+
+  <!-- 구조화 데이터 -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "KHO Gaem",
+    "url": "https://gaem.kho.kr/",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://gaem.kho.kr/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a href="#games" class="visually-hidden">본문으로 건너뛰기</a>
+
+  <header>
+    <div class="topbar container">
+      <div class="logo" aria-label="KHO Gaem">
+        <div class="logo-badge" aria-hidden="true">K</div>
+        <div class="brand">KHO Gaem</div>
+      </div>
+      <div class="spacer"></div>
+      <button id="themeBtn" class="icon-btn" type="button" title="테마 전환 (다크/라이트)">
+        <span id="themeEmoji" aria-hidden="true">🌙</span> 테마
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>KHO Gaem — 브라우저에서 바로 즐기는 HTML 게임</h1>
+      <p>검색, 장르 필터, 정렬, 즐겨찾기를 지원합니다. <span class="count" id="resultCount" aria-live="polite"></span></p>
+
+      <div class="toolbar" role="region" aria-label="검색과 필터">
+        <div class="search">
+          <svg class="s-icon" width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="m21 21l-4.3-4.3m1.8-4.7a7.5 7.5 0 1 1-15 0a7.5 7.5 0 0 1 15 0"/></svg>
+          <input id="search" type="search" placeholder="게임 검색 (이름, 태그) — / 로 포커스" aria-label="게임 검색" autocomplete="off">
+          <span class="k kbd">/</span>
+        </div>
+
+        <select id="sort" class="select" aria-label="정렬">
+          <option value="date-desc">최근 추가 순</option>
+          <option value="name-asc">이름 A→Z</option>
+          <option value="name-desc">이름 Z→A</option>
+          <option value="pop-desc">인기 순</option>
+        </select>
+
+        <div class="chips" id="genreChips" role="group" aria-label="장르 필터">
+          <button class="chip" data-genre="all" data-active="true" type="button">전체</button>
+          <button class="chip" data-genre="arcade" type="button">아케이드</button>
+          <button class="chip" data-genre="puzzle" type="button">퍼즐</button>
+          <button class="chip" data-genre="classic" type="button">클래식</button>
+          <button class="chip" data-genre="logic" type="button">논리</button>
+          <button class="chip" data-genre="board" type="button">보드</button>
+          <button class="chip" data-genre="fav" type="button">⭐ 즐겨찾기</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="games" class="grid" aria-label="게임 목록">
+      <!-- JS로 렌더링 -->
+    </section>
+
+    <div id="empty" class="empty" hidden>조건에 맞는 게임이 없어요. 필터를 조정해 보세요.</div>
+
+    <footer>
+      © <span id="year"></span> KHO Gaem · <a href="https://gaem.kho.kr/">gaem.kho.kr</a> ·
+      <a href="mailto:me@kho.kr">me@kho.kr</a>
+    </footer>
+  </main>
+
+  <script>
+    // ===== 사이트/초기 설정 =====
+    const SITE = { name: "KHO Gaem", domain: "gaem.kho.kr" };
+
+    // 다크/라이트 테마 토글
+    (function initTheme(){
+      const themeBtn = document.getElementById('themeBtn');
+      const themeEmoji = document.getElementById('themeEmoji');
+      const stored = localStorage.getItem('kho-theme');
+      if(stored){ document.documentElement.dataset.theme = stored; }
+      updateEmoji();
+
+      themeBtn.addEventListener('click', () => {
+        const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        const next = cur === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem('kho-theme', next);
+        updateEmoji();
+      });
+      function updateEmoji(){
+        const isDark = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+        themeEmoji.textContent = isDark ? '🌙' : '☀️';
+      }
+    })();
+
+    // ===== 게임 데이터 =====
+    // 필요에 맞게 자유롭게 추가/수정하세요.
+    const games = [
+      {
+        id: 'Sky Runner',
+        name: 'Sky Runner',
+        url: 'Sky Runner',
+        genre: 'arcade',
+        tags: ['숫자','스와이프'],
+        addedAt: '2025-08-16',
+        popularity: 95,
+        coverText: 'Sky Runner'
+      },
+    ];
+
+    // ===== 유틸 =====
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+    const fmtDate = s => new Date(s || Date.now());
+    const yearEl = document.getElementById('year'); yearEl.textContent = new Date().getFullYear();
+
+    function svgThumb(text){
+      const label = String(text || '').trim();
+
+      // 1) 텍스트는 URL 인코딩하지 말고 기본 문자만 이스케이프
+      const safeText = label
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // 2) 글자 수 기반 폰트 크기 자동 축소 (최소 42px)
+      //    대략 10자를 기준으로 이후 1자당 6px씩 줄임
+      const base = 140;
+      const size = Math.max(42, base - Math.max(0, label.length - 10) * 6);
+
+      // const bg1 = '#0b5bfa', bg2 = '#4f46e5';
+      const bg1 = '#0f2027';
+      const bg2 = '#2c5364';
+
+      // 텍스트가 카드 가로(800)에서 좌우 여백 고려해 720px에 들어가도록 강제
+      const textWidth = 720;
+
+      const svg = `
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'>
+      <defs>
+        <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+          <stop offset='0' stop-color='${bg1}'/>
+          <stop offset='1' stop-color='${bg2}'/>
+        </linearGradient>
+        <filter id='grain'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0.2' result='n'/><feBlend in='SourceGraphic' in2='n' mode='overlay'/></filter>
+      </defs>
+      <rect width='100%' height='100%' fill='url(#g)'/>
+      <g filter='url(#grain)'></g>
+      <text x='50%' y='55%' text-anchor='middle'
+            font-family='Inter, Arial, sans-serif'
+            font-size='${size}' font-weight='900' fill='white' opacity='.95'
+            lengthAdjust='spacingAndGlyphs' textLength='${textWidth}'
+            dominant-baseline='middle'>
+        ${safeText}
+      </text>
+      <text x='50%' y='90%' text-anchor='middle'
+            font-family='Inter, Arial, sans-serif'
+            font-size='28' fill='white' opacity='.7'>KHO Gaem</text>
+    </svg>`.trim();
+
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+
+
+    // 즐겨찾기
+    const favKey = 'kho-favs';
+    const favs = new Set(JSON.parse(localStorage.getItem(favKey) || '[]'));
+    function toggleFav(id){
+      favs.has(id) ? favs.delete(id) : favs.add(id);
+      localStorage.setItem(favKey, JSON.stringify([...favs]));
+      render();
+    }
+
+    // ===== 렌더링 & 필터 =====
+    const state = {
+      q: new URLSearchParams(location.search).get('q') || '',
+      genre: 'all',
+      sort: 'date-desc'
+    };
+
+    const grid = document.getElementById('games');
+    const empty = document.getElementById('empty');
+    const searchInput = document.getElementById('search');
+    const sortSelect = document.getElementById('sort');
+    const chips = document.getElementById('genreChips');
+    const countEl = document.getElementById('resultCount');
+
+    // 초기 값 적용
+    searchInput.value = state.q;
+    sortSelect.value = state.sort;
+
+    // 키보드 / 포커스
+    window.addEventListener('keydown', (e)=>{
+      if(e.key === '/'){
+        const tag = document.activeElement?.tagName;
+        if(tag !== 'INPUT' && tag !== 'TEXTAREA'){
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+    });
+
+    // 이벤트 바인딩
+    searchInput.addEventListener('input', () => {
+      state.q = searchInput.value.trim();
+      render();
+    });
+
+    sortSelect.addEventListener('change', () => {
+      state.sort = sortSelect.value;
+      render();
+    });
+
+    chips.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.chip');
+      if(!btn) return;
+      $$('.chip', chips).forEach(c => c.dataset.active = 'false');
+      btn.dataset.active = 'true';
+      state.genre = btn.dataset.genre;
+      render();
+    });
+
+    function applyFilters(list){
+      const q = state.q.toLowerCase();
+      let filtered = list.filter(g => {
+        const text = (g.name + ' ' + (g.tags||[]).join(' ')).toLowerCase();
+        const matchSearch = q ? text.includes(q) : true;
+        const matchGenre = state.genre === 'all'
+          ? true
+          : state.genre === 'fav'
+            ? favs.has(g.id)
+            : g.genre === state.genre;
+        return matchSearch && matchGenre;
+      });
+
+      switch(state.sort){
+        case 'name-asc': filtered.sort((a,b)=> a.name.localeCompare(b.name,'ko')); break;
+        case 'name-desc': filtered.sort((a,b)=> b.name.localeCompare(a.name,'ko')); break;
+        case 'pop-desc': filtered.sort((a,b)=> b.popularity - a.popularity); break;
+        default: filtered.sort((a,b)=> +fmtDate(b.addedAt) - +fmtDate(a.addedAt));
+      }
+      return filtered;
+    }
+
+    function gameCard(g){
+      const isFav = favs.has(g.id);
+      const alt = `${g.name} 썸네일`;
+      const tags = (g.tags||[]).map(t=>`<span class="badge" aria-label="태그 ${t}">#${t}</span>`).join('');
+      const img = svgThumb(g.coverText || g.name.slice(0,8).toUpperCase());
+      const genreMap = {arcade:'아케이드', puzzle:'퍼즐', classic:'클래식', logic:'논리', board:'보드'};
+      return `
+        <article class="card" data-id="${g.id}">
+          <div class="thumb">
+            <img loading="lazy" src="${img}" alt="${alt}">
+            <div class="badge-row">${tags}</div>
+            <button class="favorite" type="button" aria-pressed="${isFav ? 'true':'false'}" aria-label="즐겨찾기 ${g.name}" data-fav="${g.id}">⭐</button>
+          </div>
+          <div class="card-body">
+            <div class="title">${g.name}</div>
+            <div class="meta">${genreMap[g.genre] || g.genre} · 추가: ${new Date(g.addedAt).toLocaleDateString('ko-KR')}</div>
+            <div class="meta">인기도: ${g.popularity}</div>   <!-- 🔥 여기 추가 -->
+            <div class="cta">
+              <a class="btn play" href="${g.url}">▶ 플레이</a>
+              <a class="btn" href="${g.url}" target="_blank" rel="noopener">새 창</a>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function render(){
+      const list = applyFilters(games);
+      grid.innerHTML = list.map(gameCard).join('');
+      empty.hidden = list.length > 0;
+      countEl.textContent = `총 ${list.length}개`;
+
+      // 즐겨찾기 이벤트 위임
+      grid.addEventListener('click', (e)=>{
+        const favBtn = e.target.closest('[data-fav]');
+        if(favBtn){
+          toggleFav(favBtn.dataset.fav);
+        }
+      }, { once: true }); // 렌더마다 한 번만 바인딩
+      // URL 쿼리 업데이트(검색어만)
+      const params = new URLSearchParams(location.search);
+      state.q ? params.set('q', state.q) : params.delete('q');
+      const newUrl = location.pathname + (params.toString() ? '?' + params.toString() : '');
+      history.replaceState(null, '', newUrl);
+    }
+
+    render();
+  </script>
+
+  <style>
+    /* 사용자 지정 테마를 html[data-theme]로 강제 */
+    html[data-theme="light"] { color-scheme: light; }
+    html[data-theme="dark"] { color-scheme: dark; }
+  </style>
+</body>
+</html>
